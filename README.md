@@ -13,7 +13,7 @@
 
 English | [简体中文](./README.zh-CN.md)
 
-[Website](https://beampay.fun) · [App](https://app.beampay.fun)
+[Website](https://beampay.fun)
 
 </div>
 
