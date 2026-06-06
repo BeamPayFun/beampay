@@ -13,7 +13,7 @@
 
 [English](./README.md) | 简体中文
 
-[官网](https://beampay.fun) · [应用](https://app.beampay.fun)
+[官网](https://beampay.fun)
 
 </div>
 
