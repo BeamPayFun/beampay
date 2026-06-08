@@ -1,0 +1,13 @@
+{
+  "name": "beampay-docs-hub",
+  "version": "0.0.0",
+  "private": true,
+  "description": "BeamPay project landing repo + generated documentation library",
+  "type": "module",
+  "scripts": {
+    "docs:api": "node scripts/sync-api-docs.mjs",
+    "docs:contracts": "node scripts/sync-contract-docs.mjs",
+    "docs:sync": "npm run docs:api && npm run docs:contracts",
+    "docs:check": "npm run docs:sync && git diff --exit-code -- docs/api/openapi.json docs/api/reference.md docs/contracts/reference.md"
+  }
+}
