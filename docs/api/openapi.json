@@ -1,0 +1,2260 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "BeamPay Public API",
+    "version": "1.0.0",
+    "description": "BeamPay public API (Cloudflare Workers). All responses share the envelope `{ code, msg, data, timestamp }`; `code` is `\"0\"` on success. Money values in `data` are canonical decimal strings — the client owns display formatting."
+  },
+  "servers": [
+    {
+      "url": "https://api.beampay.fun",
+      "description": "Production"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Dashboard HMAC token from POST /v1/auth/login. Send as `Authorization: Bearer <token>`. Valid for 30 days."
+      },
+      "proxyAuthHmac": {
+        "type": "apiKey",
+        "in": "query",
+        "name": "signature",
+        "description": "INTERNAL / PREVIEW. Service-to-service HMAC-SHA256 over the request, carried in the four fields `timestamp`/`recvWindow`/`salt`/`signature` (query or body). This is the indexer→API relay auth and is NOT a stable merchant-facing scheme — per-merchant webhook signing is the GA design (see the webhooks integration guide)."
+      }
+    },
+    "schemas": {
+      "LoginRequest": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]{40}$"
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "signature": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]+$"
+          },
+          "issuedAt": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          }
+        },
+        "required": [
+          "address",
+          "message",
+          "signature",
+          "issuedAt"
+        ],
+        "additionalProperties": false
+      },
+      "LoginResponse": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expiresAt": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          }
+        },
+        "required": [
+          "token",
+          "expiresAt"
+        ],
+        "additionalProperties": false
+      },
+      "AuthMeResponse": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]{40}$"
+          }
+        },
+        "required": [
+          "address"
+        ],
+        "additionalProperties": false
+      },
+      "OrderEnvelope": {
+        "type": "object",
+        "properties": {
+          "chain": {
+            "type": "string",
+            "enum": [
+              "bsc",
+              "ethereum",
+              "bsc-testnet"
+            ]
+          },
+          "merchant": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]{40}$"
+          },
+          "receiver": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]{40}$"
+          },
+          "token": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]{40}$"
+          },
+          "amount": {
+            "type": "string",
+            "pattern": "^\\d+$"
+          },
+          "orderId": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]{64}$"
+          },
+          "memo": {
+            "type": "string",
+            "maxLength": 256
+          },
+          "feeBps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10
+          },
+          "signer": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]{40}$"
+          },
+          "createdAt": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "expiresAt": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "signature": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]+$"
+          },
+          "isDelegate": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "chain",
+          "merchant",
+          "receiver",
+          "token",
+          "amount",
+          "orderId",
+          "feeBps",
+          "signer",
+          "createdAt",
+          "expiresAt",
+          "signature",
+          "isDelegate"
+        ],
+        "additionalProperties": false
+      },
+      "DashboardOverview": {
+        "type": "object",
+        "properties": {
+          "kpis": {
+            "type": "object",
+            "properties": {
+              "gross": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string"
+                  },
+                  "sym": {
+                    "type": "string"
+                  },
+                  "delta": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "value",
+                  "sym",
+                  "delta"
+                ],
+                "additionalProperties": false
+              },
+              "net": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string"
+                  },
+                  "sym": {
+                    "type": "string"
+                  },
+                  "delta": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "value",
+                  "sym",
+                  "delta"
+                ],
+                "additionalProperties": false
+              },
+              "orders": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string"
+                  },
+                  "sym": {
+                    "type": "string"
+                  },
+                  "delta": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "value",
+                  "sym",
+                  "delta"
+                ],
+                "additionalProperties": false
+              },
+              "refunds": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string"
+                  },
+                  "sym": {
+                    "type": "string"
+                  },
+                  "delta": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "value",
+                  "sym",
+                  "delta"
+                ],
+                "additionalProperties": false
+              },
+              "success": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string"
+                  },
+                  "sym": {
+                    "type": "string"
+                  },
+                  "delta": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "value",
+                  "sym",
+                  "delta"
+                ],
+                "additionalProperties": false
+              },
+              "aov": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string"
+                  },
+                  "sym": {
+                    "type": "string"
+                  },
+                  "delta": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "value",
+                  "sym",
+                  "delta"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "gross",
+              "net",
+              "orders",
+              "refunds",
+              "success",
+              "aov"
+            ],
+            "additionalProperties": false
+          },
+          "tokenSplit": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "sym": {
+                  "type": "string"
+                },
+                "pct": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "color": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "sym",
+                "pct",
+                "color"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "chainSplit": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "pct": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                }
+              },
+              "required": [
+                "key",
+                "name",
+                "pct"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "series": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "d": {
+                  "type": "integer"
+                },
+                "v": {
+                  "type": "number"
+                },
+                "o": {
+                  "type": "integer"
+                },
+                "r": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "d",
+                "v",
+                "o",
+                "r"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "peakHours": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "recent": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "orderKey": {
+                  "type": "string"
+                },
+                "orderId": {
+                  "type": "string"
+                },
+                "chain": {
+                  "type": "string",
+                  "enum": [
+                    "bsc",
+                    "ethereum",
+                    "bsc-testnet"
+                  ]
+                },
+                "tokenAddress": {
+                  "type": "string"
+                },
+                "tokenSymbol": {
+                  "type": "string"
+                },
+                "tokenDecimals": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "amount": {
+                  "type": "string"
+                },
+                "paidAmount": {
+                  "type": "string"
+                },
+                "refundedAmount": {
+                  "type": "string"
+                },
+                "refundableAmount": {
+                  "type": "string"
+                },
+                "payer": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "paid",
+                    "partial",
+                    "refunded",
+                    "expired",
+                    "pending"
+                  ]
+                },
+                "priceUsd": {
+                  "type": "string"
+                },
+                "createdAt": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "paidAt": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "orderKey",
+                "orderId",
+                "chain",
+                "tokenAddress",
+                "tokenSymbol",
+                "tokenDecimals",
+                "amount",
+                "paidAmount",
+                "refundedAmount",
+                "refundableAmount",
+                "payer",
+                "status",
+                "priceUsd",
+                "createdAt",
+                "paidAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "balances": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "sym": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "chain": {
+                  "type": "string",
+                  "enum": [
+                    "bsc",
+                    "ethereum",
+                    "bsc-testnet"
+                  ]
+                },
+                "balance": {
+                  "type": "string"
+                },
+                "usd": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "sym",
+                "name",
+                "chain",
+                "balance",
+                "usd"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "merchantStats": {
+            "type": "object",
+            "properties": {
+              "fromBlock": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "indexedThrough": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "syncedAge": {
+                "type": "string"
+              },
+              "totals": {
+                "type": "object",
+                "properties": {
+                  "revenue": {
+                    "type": "string"
+                  },
+                  "refunds": {
+                    "type": "string"
+                  },
+                  "net": {
+                    "type": "string"
+                  },
+                  "payCount": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "refundCount": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "revenue",
+                  "refunds",
+                  "net",
+                  "payCount",
+                  "refundCount"
+                ],
+                "additionalProperties": false
+              },
+              "tokens": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "tokenSymbol": {
+                      "type": "string"
+                    },
+                    "tokenAddress": {
+                      "type": "string"
+                    },
+                    "tokenDecimals": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "chain": {
+                      "type": "string",
+                      "enum": [
+                        "bsc",
+                        "ethereum",
+                        "bsc-testnet"
+                      ]
+                    },
+                    "revenueQty": {
+                      "type": "string"
+                    },
+                    "refundsQty": {
+                      "type": "string"
+                    },
+                    "netQty": {
+                      "type": "string"
+                    },
+                    "revenueUsd": {
+                      "type": "string"
+                    },
+                    "refundsUsd": {
+                      "type": "string"
+                    },
+                    "netUsd": {
+                      "type": "string"
+                    },
+                    "payCount": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "refundCount": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "tokenSymbol",
+                    "tokenAddress",
+                    "tokenDecimals",
+                    "chain",
+                    "revenueQty",
+                    "refundsQty",
+                    "netQty",
+                    "revenueUsd",
+                    "refundsUsd",
+                    "netUsd",
+                    "payCount",
+                    "refundCount"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "events": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "Payment",
+                        "Refunded"
+                      ]
+                    },
+                    "token": {
+                      "type": "string"
+                    },
+                    "chain": {
+                      "type": "string",
+                      "enum": [
+                        "bsc",
+                        "ethereum",
+                        "bsc-testnet"
+                      ]
+                    },
+                    "amount": {
+                      "type": "string"
+                    },
+                    "order": {
+                      "type": "string"
+                    },
+                    "tx": {
+                      "type": "string"
+                    },
+                    "block": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "age": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "token",
+                    "chain",
+                    "amount",
+                    "order",
+                    "tx",
+                    "block",
+                    "age"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "fromBlock",
+              "indexedThrough",
+              "syncedAge",
+              "totals",
+              "tokens",
+              "events"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "kpis",
+          "tokenSplit",
+          "chainSplit",
+          "series",
+          "peakHours",
+          "recent",
+          "balances",
+          "merchantStats"
+        ],
+        "additionalProperties": false
+      },
+      "OrderListResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "orderKey": {
+                  "type": "string"
+                },
+                "orderId": {
+                  "type": "string"
+                },
+                "chain": {
+                  "type": "string",
+                  "enum": [
+                    "bsc",
+                    "ethereum",
+                    "bsc-testnet"
+                  ]
+                },
+                "tokenAddress": {
+                  "type": "string"
+                },
+                "tokenSymbol": {
+                  "type": "string"
+                },
+                "tokenDecimals": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "amount": {
+                  "type": "string"
+                },
+                "paidAmount": {
+                  "type": "string"
+                },
+                "refundedAmount": {
+                  "type": "string"
+                },
+                "refundableAmount": {
+                  "type": "string"
+                },
+                "payer": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "paid",
+                    "partial",
+                    "refunded",
+                    "expired",
+                    "pending"
+                  ]
+                },
+                "priceUsd": {
+                  "type": "string"
+                },
+                "createdAt": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "paidAt": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "orderKey",
+                "orderId",
+                "chain",
+                "tokenAddress",
+                "tokenSymbol",
+                "tokenDecimals",
+                "amount",
+                "paidAmount",
+                "refundedAmount",
+                "refundableAmount",
+                "payer",
+                "status",
+                "priceUsd",
+                "createdAt",
+                "paidAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "limit": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "statusCounts": {
+            "type": "object",
+            "properties": {
+              "all": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "pending": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "paid": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "partial": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "refunded": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "expired": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "all",
+              "pending",
+              "paid",
+              "partial",
+              "refunded",
+              "expired"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "offset",
+          "limit",
+          "statusCounts"
+        ],
+        "additionalProperties": false
+      },
+      "OrderDetail": {
+        "type": "object",
+        "properties": {
+          "orderKey": {
+            "type": "string"
+          },
+          "orderId": {
+            "type": "string"
+          },
+          "chain": {
+            "type": "string",
+            "enum": [
+              "bsc",
+              "ethereum",
+              "bsc-testnet"
+            ]
+          },
+          "merchant": {
+            "type": "string"
+          },
+          "payer": {
+            "type": "string"
+          },
+          "receiver": {
+            "type": "string"
+          },
+          "router": {
+            "type": "string"
+          },
+          "tokenAddress": {
+            "type": "string"
+          },
+          "tokenSymbol": {
+            "type": "string"
+          },
+          "tokenDecimals": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "amount": {
+            "type": "string"
+          },
+          "paidAmount": {
+            "type": "string"
+          },
+          "refundedAmount": {
+            "type": "string"
+          },
+          "refundableAmount": {
+            "type": "string"
+          },
+          "priceUsd": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "paid",
+              "partial",
+              "refunded",
+              "expired",
+              "pending"
+            ]
+          },
+          "createdAt": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "paidAt": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "expiresAt": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "payTxHash": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "orderKey",
+          "orderId",
+          "chain",
+          "merchant",
+          "payer",
+          "receiver",
+          "router",
+          "tokenAddress",
+          "tokenSymbol",
+          "tokenDecimals",
+          "amount",
+          "paidAmount",
+          "refundedAmount",
+          "refundableAmount",
+          "priceUsd",
+          "status",
+          "createdAt",
+          "paidAt",
+          "expiresAt",
+          "payTxHash"
+        ],
+        "additionalProperties": false
+      },
+      "RefundList": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "chain": {
+              "type": "string",
+              "enum": [
+                "bsc",
+                "ethereum",
+                "bsc-testnet"
+              ]
+            },
+            "amount": {
+              "type": "string"
+            },
+            "tokenAddress": {
+              "type": "string"
+            },
+            "tokenSymbol": {
+              "type": "string"
+            },
+            "tokenDecimals": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "txHash": {
+              "type": "string"
+            },
+            "logIndex": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "blockTime": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "priceUsd": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "chain",
+            "amount",
+            "tokenAddress",
+            "tokenSymbol",
+            "tokenDecimals",
+            "txHash",
+            "logIndex",
+            "blockTime",
+            "priceUsd"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "OrderWebhookBody": {
+        "type": "object",
+        "properties": {
+          "chain": {
+            "type": "string",
+            "enum": [
+              "bsc",
+              "ethereum",
+              "bsc-testnet"
+            ]
+          },
+          "orderKey": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]{64}$"
+          },
+          "orderId": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]{64}$"
+          },
+          "eventType": {
+            "type": "string",
+            "enum": [
+              "Payment",
+              "Refund"
+            ]
+          },
+          "txHash": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]{64}$"
+          },
+          "payload": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "timestamp": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "recvWindow": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 60000
+          },
+          "salt": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "signature": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        },
+        "required": [
+          "chain",
+          "orderKey",
+          "orderId",
+          "eventType",
+          "txHash",
+          "payload",
+          "timestamp",
+          "recvWindow",
+          "salt",
+          "signature"
+        ],
+        "additionalProperties": false
+      },
+      "CreateOrderResponseData": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "orderKey": {
+            "type": "string"
+          },
+          "orderId": {
+            "type": "string"
+          },
+          "envelope": {
+            "type": "object",
+            "properties": {
+              "chain": {
+                "type": "string",
+                "enum": [
+                  "bsc",
+                  "ethereum",
+                  "bsc-testnet"
+                ]
+              },
+              "merchant": {
+                "type": "string",
+                "pattern": "^0x[0-9a-fA-F]{40}$"
+              },
+              "receiver": {
+                "type": "string",
+                "pattern": "^0x[0-9a-fA-F]{40}$"
+              },
+              "token": {
+                "type": "string",
+                "pattern": "^0x[0-9a-fA-F]{40}$"
+              },
+              "amount": {
+                "type": "string",
+                "pattern": "^\\d+$"
+              },
+              "orderId": {
+                "type": "string",
+                "pattern": "^0x[0-9a-fA-F]{64}$"
+              },
+              "memo": {
+                "type": "string",
+                "maxLength": 256
+              },
+              "feeBps": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10
+              },
+              "signer": {
+                "type": "string",
+                "pattern": "^0x[0-9a-fA-F]{40}$"
+              },
+              "createdAt": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "expiresAt": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "signature": {
+                "type": "string",
+                "pattern": "^0x[0-9a-fA-F]+$"
+              },
+              "isDelegate": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "chain",
+              "merchant",
+              "receiver",
+              "token",
+              "amount",
+              "orderId",
+              "feeBps",
+              "signer",
+              "createdAt",
+              "expiresAt",
+              "signature",
+              "isDelegate"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "orderKey",
+          "orderId",
+          "envelope"
+        ],
+        "additionalProperties": false
+      },
+      "OrderWebhookResponseData": {
+        "type": "object",
+        "properties": {
+          "received": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "echoed": {
+            "type": "object",
+            "properties": {
+              "chain": {
+                "type": "string",
+                "enum": [
+                  "bsc",
+                  "ethereum",
+                  "bsc-testnet"
+                ]
+              },
+              "orderKey": {
+                "type": "string",
+                "pattern": "^0x[0-9a-fA-F]{64}$"
+              },
+              "orderId": {
+                "type": "string",
+                "pattern": "^0x[0-9a-fA-F]{64}$"
+              },
+              "eventType": {
+                "type": "string",
+                "enum": [
+                  "Payment",
+                  "Refund"
+                ]
+              },
+              "txHash": {
+                "type": "string",
+                "pattern": "^0x[0-9a-fA-F]{64}$"
+              },
+              "payload": {
+                "type": "object",
+                "additionalProperties": {}
+              },
+              "timestamp": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "recvWindow": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 60000
+              },
+              "salt": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "signature": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            },
+            "required": [
+              "chain",
+              "orderKey",
+              "orderId",
+              "eventType",
+              "txHash",
+              "payload",
+              "timestamp",
+              "recvWindow",
+              "salt",
+              "signature"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "received",
+          "echoed"
+        ],
+        "additionalProperties": false
+      },
+      "HealthData": {
+        "type": "object",
+        "properties": {
+          "service": {
+            "type": "string"
+          },
+          "ts": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "service",
+          "ts"
+        ],
+        "additionalProperties": false
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "msg": {
+            "type": "string"
+          },
+          "data": {
+            "type": "null"
+          },
+          "timestamp": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "code",
+          "msg",
+          "timestamp"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "parameters": {}
+  },
+  "paths": {
+    "/v1/health-check": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Liveness probe",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/HealthData"
+                    },
+                    "timestamp": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "msg",
+                    "data",
+                    "timestamp"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Exchange a wallet signature for a dashboard token",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/LoginResponse"
+                    },
+                    "timestamp": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "msg",
+                    "data",
+                    "timestamp"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "null"
+                    },
+                    "timestamp": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "msg",
+                    "timestamp"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/me": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Address bound to the current token",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/AuthMeResponse"
+                    },
+                    "timestamp": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "msg",
+                    "data",
+                    "timestamp"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "null"
+                    },
+                    "timestamp": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "msg",
+                    "timestamp"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/orders": {
+      "post": {
+        "tags": [
+          "Orders"
+        ],
+        "summary": "Register a signed EIP-712 order envelope",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderEnvelope"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/CreateOrderResponseData"
+                    },
+                    "timestamp": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "msg",
+                    "data",
+                    "timestamp"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "null"
+                    },
+                    "timestamp": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "msg",
+                    "timestamp"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "null"
+                    },
+                    "timestamp": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "msg",
+                    "timestamp"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Orders"
+        ],
+        "summary": "Merchant order list (offset pagination)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mainnet",
+                "testnet"
+              ],
+              "default": "mainnet"
+            },
+            "required": false,
+            "name": "scope",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "paid",
+                "partial",
+                "refunded",
+                "expired"
+              ]
+            },
+            "required": false,
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 66
+            },
+            "required": false,
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            },
+            "required": false,
+            "name": "offset",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "required": false,
+            "name": "startTime",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "required": false,
+            "name": "endTime",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/OrderListResponse"
+                    },
+                    "timestamp": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "msg",
+                    "data",
+                    "timestamp"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "null"
+                    },
+                    "timestamp": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "msg",
+                    "timestamp"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "null"
+                    },
+                    "timestamp": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "msg",
+                    "timestamp"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/overview": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "Merchant dashboard aggregate",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mainnet",
+                "testnet"
+              ],
+              "default": "mainnet"
+            },
+            "required": false,
+            "name": "scope",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/DashboardOverview"
+                    },
+                    "timestamp": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "msg",
+                    "data",
+                    "timestamp"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "null"
+                    },
+                    "timestamp": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "msg",
+                    "timestamp"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "null"
+                    },
+                    "timestamp": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "msg",
+                    "timestamp"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/orders/{orderKey}/refunds": {
+      "get": {
+        "tags": [
+          "Orders"
+        ],
+        "summary": "Refund events for an order (newest first)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^0x[0-9a-fA-F]{64}$"
+            },
+            "required": true,
+            "name": "orderKey",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/RefundList"
+                    },
+                    "timestamp": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "msg",
+                    "data",
+                    "timestamp"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "null"
+                    },
+                    "timestamp": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "msg",
+                    "timestamp"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Order not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "null"
+                    },
+                    "timestamp": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "msg",
+                    "timestamp"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/orders/{orderKey}": {
+      "get": {
+        "tags": [
+          "Orders"
+        ],
+        "summary": "Single order rich view (ownership-checked)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^0x[0-9a-fA-F]{64}$"
+            },
+            "required": true,
+            "name": "orderKey",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/OrderDetail"
+                    },
+                    "timestamp": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "msg",
+                    "data",
+                    "timestamp"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "null"
+                    },
+                    "timestamp": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "msg",
+                    "timestamp"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Order not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "null"
+                    },
+                    "timestamp": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "msg",
+                    "timestamp"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/webhook/orders": {
+      "post": {
+        "tags": [
+          "Webhook"
+        ],
+        "summary": "Merchant order webhook relay (Payment/Refund) — PREVIEW",
+        "description": "INTERNAL / PREVIEW. v1 echoes the validated body. Auth is the internal proxyAuth HMAC (see security). Per-merchant webhook signing is the GA design — do not build against the proxyAuth fields as a stable merchant contract.",
+        "security": [
+          {
+            "proxyAuthHmac": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderWebhookBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/OrderWebhookResponseData"
+                    },
+                    "timestamp": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "msg",
+                    "data",
+                    "timestamp"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "null"
+                    },
+                    "timestamp": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "msg",
+                    "timestamp"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "null"
+                    },
+                    "timestamp": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "msg",
+                    "timestamp"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "webhooks": {}
+}

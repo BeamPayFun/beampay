@@ -46,11 +46,11 @@ Native assets (ETH / BNB) are represented by the sentinel `0xEeee…EEeE` and mu
 
 - **Dual-rail settlement** — one `pay()` entrypoint handles both ERC20 (`SafeERC20`) and native (`.call{value:}`) rails with identical fee semantics.
 - **Signed orders** — merchant backend signs `(merchant, receiver, token, amount, orderId, signer, createdAt, expiresAt)`; the router verifies the signature and rejects expired or replayed orders.
-- **Blacklist-resistant fee path** — if the fee leg to the protocol reverts (e.g. a USDT/USDC blacklist), the fee is redirected to the merchant. Invariant: `merchant_received + protocol_received == amount`, always.
+- **Blacklist-resistant fee path** — if the fee leg to the protocol reverts (e.g. a USDT/USDC blacklist), the fee is redirected to the order's `receiver`. Invariant: `receiver_received + protocol_received == amount`, always.
 - **Refunds** — merchants can refund up to the paid amount (cumulative); the fee is never refunded; payer is read from the on-chain order record, not the caller.
 - **No pause, no admin backdoor.** Token whitelist is add-only; there is no emergency stop and no privileged withdrawal.
 - **7-day timelocked governance.** Fee changes flow through `proposeFeeChange` → wait 7 days → `executeFeeChange`. Governance transfer is two-step and renounceable.
-- **Webhook delivery** — an indexer turns `Paid` / `Refunded` events into signed HTTP callbacks to merchant systems.
+- **Webhook delivery** _(preview)_ — an indexer turns `Paid` / `Refunded` events into signed HTTP callbacks to merchant systems. Outbound delivery is not yet GA; see [docs/integration/webhooks.md](./docs/integration/webhooks.md).
 - **Drop-in checkout widget** — a framework-agnostic embeddable widget plus a typed merchant SDK.
 
 ## How It Works
@@ -96,8 +96,12 @@ BeamPay is a set of self-contained repos, cloned side-by-side for local developm
 
 ## Documentation
 
-- **Contract design & invariants:** [beampay-contracts/CLAUDE.md](https://github.com/BeamPayFun/beampay-contracts/blob/main/CLAUDE.md)
-- **Merchant integration:** see [`@beampay/sdk`](https://github.com/BeamPayFun/beampay-libs) and [`@beampay/checkout`](https://github.com/BeamPayFun/beampay-checkout)
+Full integration docs live in [`docs/`](./docs/) — generated from source and readable on GitHub.
+
+- **Contracts** — [reference](./docs/contracts/reference.md) · [deployed addresses](./docs/contracts/addresses.md) · [security invariants](./docs/contracts/invariants.md)
+- **API** — [HTTP API reference](./docs/api/reference.md) · [`openapi.json`](./docs/api/openapi.json)
+- **Integration guides** — [order signing (EIP-712)](./docs/integration/signing.md) · [native asset payments](./docs/integration/native-asset.md) · [webhooks (preview)](./docs/integration/webhooks.md)
+- **SDK & widget** — [`@beampay/sdk`](https://github.com/BeamPayFun/beampay-libs) · [`@beampay/checkout`](https://github.com/BeamPayFun/beampay-checkout)
 
 ## Security & Design Invariants
 
@@ -106,8 +110,8 @@ The router is built around load-bearing invariants that may not change without a
 1. **Funds never held in the contract** — contract balance is always 0.
 2. **Hard fee ceiling** — `FEE_RATE_HARD_LIMIT = 10` bps is `constant`; no governance op can exceed it.
 3. **No pause, no emergency, no admin backdoor** — token whitelist is add-only.
-4. **All parameter changes go through a 7-day timelock.**
-5. **Blacklist-resistant fee path** — `merchant_received + protocol_received == amount`.
+4. **Fee-rate changes go through a 7-day timelock.** (Other governance actions are immediate `onlyGov` calls, bounded by the invariants here.)
+5. **Blacklist-resistant fee path** — `receiver_received + protocol_received == amount`.
 6. **CEI + `nonReentrant`** — order state is written before any external call.
 7. **Dual-rail safety** — same try/redirect/main-leg semantics on the ERC20 and native paths.
 8. **Two-step governance transfer + `renounceGovernance`.**
