@@ -10,6 +10,9 @@ router. Written for **external integrators** (merchants, wallets, SDK consumers)
 - [Deployed addresses](./contracts/addresses.md) — router + token addresses per chain.
 - [Security & design invariants](./contracts/invariants.md) — the load-bearing guarantees you can
   rely on.
+- [Contracts repo deep-dive README](https://github.com/BeamPayFun/beampay-contracts#readme) ·
+  [中文](https://github.com/BeamPayFun/beampay-contracts/blob/main/README.zh-CN.md) — business +
+  developer walkthrough of the router's guarantees.
 
 ## API
 

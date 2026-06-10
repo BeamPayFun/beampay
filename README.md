@@ -60,9 +60,9 @@ Native assets (ETH / BNB) are represented by the sentinel `0xEeee…EEeE` and mu
   ────────────────                ────────────              ────────────────────────         ───────
   1. create order
   2. sign order  ───────────────▶ 3. submit pay(...)  ────▶ 4. verify signature
-                                                            5. transfer payer → merchant
+                                                            5. transfer payer → receiver
                                                             6. transfer payer → feeRecipient
-                                                               (redirect to merchant if blocked)
+                                                               (redirect to receiver if blocked)
                                                             7. emit Paid event  ─────────────▶ 8. webhook → merchant
 ```
 
@@ -80,7 +80,7 @@ BeamPay is a set of self-contained repos, cloned side-by-side for local developm
 
 | Repo | What it is | Stack | Deploy |
 |---|---|---|---|
-| [beampay-contracts](https://github.com/BeamPayFun/beampay-contracts) | The `BeamPayRouter` contract + tests | Foundry, solc 0.8.28, viaIR, Slither | Etherscan-verified |
+| [beampay-contracts](https://github.com/BeamPayFun/beampay-contracts) | The `BeamPayRouter` contract + tests ([deep-dive README](https://github.com/BeamPayFun/beampay-contracts#readme)) | Foundry, solc 0.8.28, viaIR, Slither | Etherscan-verified |
 | [beampay-libs](https://github.com/BeamPayFun/beampay-libs) | `@beampay/*` packages — ABI, schemas, SDK, common | pnpm + Turborepo | npm |
 | [beampay-checkout](https://github.com/BeamPayFun/beampay-checkout) | Embeddable checkout widget | Vite 6 + Lit 3 + `@wagmi/core` | npm + CDN IIFE |
 
